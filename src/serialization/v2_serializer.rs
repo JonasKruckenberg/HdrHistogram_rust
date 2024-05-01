@@ -1,8 +1,9 @@
 use super::{Serializer, V2_COOKIE, V2_HEADER_SIZE};
 use crate::{Counter, Histogram};
-use byteorder::{BigEndian, WriteBytesExt};
+use byteorder::{BigEndian, ByteOrder};
+#[cfg(feature = "std")]
 use std::io::{self, Write};
-use std::{error, fmt};
+use core::fmt;
 
 /// Errors that occur during serialization.
 #[derive(Debug)]
@@ -14,9 +15,11 @@ pub enum V2SerializeError {
     /// hardware.
     UsizeTypeTooSmall,
     /// An i/o operation failed.
+    #[cfg(feature = "std")]
     IoError(io::Error),
 }
 
+#[cfg(feature = "std")]
 impl std::convert::From<std::io::Error> for V2SerializeError {
     fn from(e: std::io::Error) -> Self {
         V2SerializeError::IoError(e)
@@ -33,13 +36,15 @@ impl fmt::Display for V2SerializeError {
             V2SerializeError::UsizeTypeTooSmall => {
                 write!(f, "Internal calculations cannot be represented in `usize`")
             }
+            #[cfg(feature = "std")]
             V2SerializeError::IoError(e) => write!(f, "An i/o operation failed: {}", e),
         }
     }
 }
 
-impl error::Error for V2SerializeError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+#[cfg(feature = "std")]
+impl std::error::Error for V2SerializeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             V2SerializeError::IoError(e) => Some(e),
             _ => None,
@@ -48,64 +53,71 @@ impl error::Error for V2SerializeError {
 }
 
 /// Serializer for the V2 binary format.
-pub struct V2Serializer {
-    buf: Vec<u8>,
-}
+#[derive(Default)]
+pub struct V2Serializer;
 
-impl Default for V2Serializer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 impl V2Serializer {
     /// Create a new serializer.
     pub fn new() -> V2Serializer {
-        V2Serializer { buf: Vec::new() }
+        V2Serializer::default()
     }
 }
 
 impl Serializer for V2Serializer {
     type SerializeError = V2SerializeError;
 
-    fn serialize<T: Counter, W: Write>(
-        &mut self,
-        h: &Histogram<T>,
-        writer: &mut W,
-    ) -> Result<usize, V2SerializeError> {
+    fn max_size<T: Counter>(&self, h: &Histogram<T>) -> Result<usize, Self::SerializeError> {
+        max_encoded_size(h).ok_or(V2SerializeError::UsizeTypeTooSmall)
+    }
+
+    fn serialize_to_buf<T: Counter>(&mut self, h: &Histogram<T>, buf: &mut [u8]) -> Result<usize, Self::SerializeError> {
         // TODO benchmark encoding directly into target Vec
+        assert_eq!(buf.len(), self.max_size(h)?);
 
-        self.buf.clear();
-        let max_size = max_encoded_size(h).ok_or(V2SerializeError::UsizeTypeTooSmall)?;
-        self.buf.reserve(max_size);
-
-        self.buf.write_u32::<BigEndian>(V2_COOKIE)?;
+        BigEndian::write_u32(buf, V2_COOKIE);
         // placeholder for length
-        self.buf.write_u32::<BigEndian>(0)?;
+        BigEndian::write_u32(buf, 0);
         // normalizing index offset
-        self.buf.write_u32::<BigEndian>(0)?;
-        self.buf
-            .write_u32::<BigEndian>(u32::from(h.significant_value_digits))?;
-        self.buf
-            .write_u64::<BigEndian>(h.lowest_discernible_value)?;
-        self.buf.write_u64::<BigEndian>(h.highest_trackable_value)?;
+        BigEndian::write_u32(buf, 0);
+        BigEndian::write_u32(buf, u32::from(h.significant_value_digits));
+        BigEndian::write_u64(buf, h.lowest_discernible_value);
+        BigEndian::write_u64(buf, h.highest_trackable_value);
         // int to double conversion
-        self.buf.write_f64::<BigEndian>(1.0)?;
+        BigEndian::write_f64(buf, 1.0);
 
-        debug_assert_eq!(V2_HEADER_SIZE, self.buf.len());
+        debug_assert_eq!(V2_HEADER_SIZE, buf.len());
+        // unsafe {
+        //     // want to treat the rest of the vec as a slice, and we've already reserved this
+        //     // space, so this way we don't have to resize() on a lot of dummy bytes.
+        //     buf.set_len(self.size_hint(h)?);
+        // }
 
-        unsafe {
-            // want to treat the rest of the vec as a slice, and we've already reserved this
-            // space, so this way we don't have to resize() on a lot of dummy bytes.
-            self.buf.set_len(max_size);
-        }
-
-        let counts_len = encode_counts(h, &mut self.buf[V2_HEADER_SIZE..])?;
+        let counts_len = encode_counts(h, &mut buf[V2_HEADER_SIZE..])?;
         // addition should be safe as max_size is already a usize
         let total_len = V2_HEADER_SIZE + counts_len;
 
         // TODO benchmark fastest buffer management scheme
         // counts is always under 2^24
-        (&mut self.buf[4..8]).write_u32::<BigEndian>(counts_len as u32)?;
+        BigEndian::write_u32(&mut buf[4..8], counts_len as u32);
+
+        Ok(total_len)
+    }
+
+    #[cfg(feature = "std")]
+    fn serialize<T: Counter, W: std::io::Write>(
+        &mut self,
+        h: &Histogram<T>,
+        writer: &mut W,
+    ) -> Result<usize, V2SerializeError> {
+        let max_size = self.max_size(h)?;
+        let mut buf = Vec::with_capacity(max_size);
+
+        unsafe {
+            // `serialize_to_vec` expects a slice that is `max_size` bytes long
+            buf.set_len(max_size);
+        }
+
+        let total_len = self.serialize_to_buf(h, &mut buf)?;
 
         writer
             .write_all(&self.buf[0..(total_len)])

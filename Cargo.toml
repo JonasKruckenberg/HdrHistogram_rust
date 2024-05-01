@@ -22,10 +22,10 @@ license = "MIT/Apache-2.0"
 
 [features]
 default = [ "serialization", "sync", "std" ]
-std = ["byteorder/std", "num-traits/std"]
+std = ["byteorder/std", "num-traits/std", "flate2", "nom", "base64"]
 core = ["libm"]
 bench_private = [] # for enabling nightly-only feature(test) on the main crate to allow benchmarking private code
-serialization = [ "flate2", "nom", "base64" ]
+serialization = [ ]
 sync = [ "crossbeam-channel" ]
 
 [dependencies]

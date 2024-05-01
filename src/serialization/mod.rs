@@ -178,7 +178,9 @@
 //! ```
 //!
 
-use std::{fmt, io};
+use core::fmt;
+#[cfg(feature = "std")]
+use std::io;
 
 use super::{Counter, Histogram};
 
@@ -191,18 +193,25 @@ mod benchmarks;
 mod v2_serializer;
 pub use self::v2_serializer::{V2SerializeError, V2Serializer};
 
+#[cfg(feature = "std")]
 mod v2_deflate_serializer;
+#[cfg(feature = "std")]
 pub use self::v2_deflate_serializer::{V2DeflateSerializeError, V2DeflateSerializer};
 
+#[cfg(feature = "std")]
 mod deserializer;
+#[cfg(feature = "std")]
 pub use self::deserializer::{DeserializeError, Deserializer};
 
+#[cfg(feature = "std")]
 pub mod interval_log;
 
 const V2_COOKIE_BASE: u32 = 0x1c84_9303;
+#[cfg(feature = "std")]
 const V2_COMPRESSED_COOKIE_BASE: u32 = 0x1c84_9304;
 
 const V2_COOKIE: u32 = V2_COOKIE_BASE | 0x10;
+#[cfg(feature = "std")]
 const V2_COMPRESSED_COOKIE: u32 = V2_COMPRESSED_COOKIE_BASE | 0x10;
 
 const V2_HEADER_SIZE: usize = 40;
@@ -214,10 +223,21 @@ pub trait Serializer {
     /// Error type returned when serialization fails.
     type SerializeError: fmt::Debug;
 
+    /// Return the maximum encoded size of a histogram in bytes
+    fn max_size<T: Counter>(&self, h: &Histogram<T>) -> Result<usize, Self::SerializeError>;
+
+    /// Serialize the histogram into the provided slice. The slice must be `Self::max_size` in length.
+    fn serialize_to_buf<T: Counter>(
+        &mut self,
+        h: &Histogram<T>,
+        buf: &mut [u8],
+    ) -> Result<usize, Self::SerializeError>;
+
     /// Serialize the histogram into the provided writer.
     /// Returns the number of bytes written, or an error.
     ///
     /// Note that `Vec<u8>` is a reasonable `Write` implementation for simple usage.
+    #[cfg(feature = "std")]
     fn serialize<T: Counter, W: io::Write>(
         &mut self,
         h: &Histogram<T>,

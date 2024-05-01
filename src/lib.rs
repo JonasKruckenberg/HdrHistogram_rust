@@ -200,7 +200,7 @@
 #[cfg(all(test, feature = "bench_private"))]
 extern crate test;
 
-#[cfg(feature = "serialization")]
+#[cfg(all(feature = "serialization", feature = "std"))]
 #[macro_use]
 extern crate nom;
 
@@ -1611,7 +1611,7 @@ impl<T: Counter> Histogram<T> {
     }
 
     /// Returns an error if the index doesn't exist.
-    #[cfg(feature = "serialization")]
+    #[cfg(all(feature = "serialization", feature = "std"))]
     fn set_count_at_index(&mut self, index: usize, count: T) -> Result<(), ()> {
         let r = self.counts.get_mut(index).ok_or(())?;
         *r = count;
