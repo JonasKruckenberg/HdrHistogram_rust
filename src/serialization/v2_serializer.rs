@@ -2,7 +2,7 @@ use super::{Serializer, V2_COOKIE, V2_HEADER_SIZE};
 use crate::{Counter, Histogram};
 use byteorder::{BigEndian, ByteOrder};
 #[cfg(feature = "std")]
-use std::io::{self, Write};
+use std::io;
 use core::{fmt, mem};
 
 /// Errors that occur during serialization.
@@ -123,7 +123,7 @@ impl Serializer for V2Serializer {
         let total_len = self.serialize_to_buf(h, &mut buf)?;
 
         writer
-            .write_all(&self.buf[0..(total_len)])
+            .write_all(&buf[0..(total_len)])
             .map(|_| total_len)
             .map_err(V2SerializeError::IoError)
     }

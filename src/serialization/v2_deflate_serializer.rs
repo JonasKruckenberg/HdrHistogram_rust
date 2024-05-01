@@ -75,6 +75,14 @@ impl V2DeflateSerializer {
 impl Serializer for V2DeflateSerializer {
     type SerializeError = V2DeflateSerializeError;
 
+    fn max_size<T: Counter>(&self, _h: &Histogram<T>) -> Result<usize, Self::SerializeError> {
+        todo!()
+    }
+
+    fn serialize_to_buf<T: Counter>(&mut self, _h: &Histogram<T>, _buf: &mut [u8]) -> Result<usize, Self::SerializeError> {
+        todo!()
+    }
+
     fn serialize<T: Counter, W: Write>(
         &mut self,
         h: &Histogram<T>,
