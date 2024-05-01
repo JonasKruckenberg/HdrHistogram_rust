@@ -3,7 +3,7 @@ use crate::{Counter, Histogram};
 use byteorder::{BigEndian, ByteOrder};
 #[cfg(feature = "std")]
 use std::io::{self, Write};
-use core::fmt;
+use core::{fmt, mem};
 
 /// Errors that occur during serialization.
 #[derive(Debug)]
@@ -75,23 +75,26 @@ impl Serializer for V2Serializer {
         // TODO benchmark encoding directly into target Vec
         assert_eq!(buf.len(), self.max_size(h)?);
 
-        BigEndian::write_u32(buf, V2_COOKIE);
+        let mut pos = 0;
+        BigEndian::write_u32(&mut buf[pos..], V2_COOKIE);
+        pos += mem::size_of::<u32>();
         // placeholder for length
-        BigEndian::write_u32(buf, 0);
+        BigEndian::write_u32(&mut buf[pos..], 0);
+        pos += mem::size_of::<u32>();
         // normalizing index offset
-        BigEndian::write_u32(buf, 0);
-        BigEndian::write_u32(buf, u32::from(h.significant_value_digits));
-        BigEndian::write_u64(buf, h.lowest_discernible_value);
-        BigEndian::write_u64(buf, h.highest_trackable_value);
+        BigEndian::write_u32(&mut buf[pos..], 0);
+        pos += mem::size_of::<u32>();
+        BigEndian::write_u32(&mut buf[pos..], u32::from(h.significant_value_digits));
+        pos += mem::size_of::<u32>();
+        BigEndian::write_u64(&mut buf[pos..], h.lowest_discernible_value);
+        pos += mem::size_of::<u64>();
+        BigEndian::write_u64(&mut buf[pos..], h.highest_trackable_value);
+        pos += mem::size_of::<u64>();
         // int to double conversion
-        BigEndian::write_f64(buf, 1.0);
+        BigEndian::write_f64(&mut buf[pos..], 1.0);
+        pos += mem::size_of::<f64>();
 
-        debug_assert_eq!(V2_HEADER_SIZE, buf.len());
-        // unsafe {
-        //     // want to treat the rest of the vec as a slice, and we've already reserved this
-        //     // space, so this way we don't have to resize() on a lot of dummy bytes.
-        //     buf.set_len(self.size_hint(h)?);
-        // }
+        debug_assert_eq!(pos, V2_HEADER_SIZE);
 
         let counts_len = encode_counts(h, &mut buf[V2_HEADER_SIZE..])?;
         // addition should be safe as max_size is already a usize
