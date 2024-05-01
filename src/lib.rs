@@ -184,7 +184,7 @@
 //! cases](https://github.com/HdrHistogram/HdrHistogram/tree/master/src/test/java/org/HdrHistogram),
 //! and try to make sure you implement appropriate traits to make the use of the feature as
 //! ergonomic as possible.
-
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(
     missing_docs,
     trivial_casts,
@@ -204,12 +204,16 @@ extern crate test;
 #[macro_use]
 extern crate nom;
 
-use num_traits::ToPrimitive;
-use std::borrow::Borrow;
-use std::cmp;
-use std::ops::{Add, AddAssign, Sub, SubAssign};
+extern crate alloc;
 
+use num_traits::ToPrimitive;
+use alloc::borrow::Borrow;
+use ::core::cmp;
+use ::core::ops::{Add, AddAssign, Sub, SubAssign};
+use alloc::vec::Vec;
 use iterators::HistogramIterator;
+#[cfg(not(feature = "std"))]
+use num_traits::float::FloatCore;
 
 /// Min value of a new histogram.
 /// Equivalent to `u64::max_value()`, but const functions aren't allowed (yet).
@@ -756,8 +760,11 @@ impl<T: Counter> Histogram<T> {
 
         // largest value with single unit resolution, in [2, 200_000].
         let largest = 2 * 10_u32.pow(u32::from(sigfig));
-
+        #[cfg(feature = "std")]
         let unit_magnitude = (low as f64).log2().floor() as u8;
+        #[cfg(feature = "core")]
+        let unit_magnitude = libm::log2(low as f64).floor() as u8;
+
         let unit_magnitude_mask = (1 << unit_magnitude) - 1;
 
         // We need to maintain power-of-two sub_bucket_count (for clean direct indexing) that is
@@ -767,7 +774,11 @@ impl<T: Counter> Histogram<T> {
         // that.
         // In [1, 18]. 2^18 > 2 * 10^5 (the largest possible
         // largest_value_with_single_unit_resolution)
-        let sub_bucket_count_magnitude = (f64::from(largest)).log2().ceil() as u8;
+        #[cfg(feature = "std")]
+        let sub_bucket_count_magnitude = f64::from(largest).log2().ceil() as u8;
+        #[cfg(feature = "core")]
+        let sub_bucket_count_magnitude = libm::log2(f64::from(largest)).ceil() as u8;
+
         let sub_bucket_half_count_magnitude = sub_bucket_count_magnitude - 1;
         let sub_bucket_count = 1_u32 << u32::from(sub_bucket_count_magnitude);
 
@@ -1315,7 +1326,10 @@ impl<T: Counter> Histogram<T> {
             gdt + (dev * dev) * v.count_since_last_iteration() as f64
         });
 
-        (geom_dev_tot / self.total_count as f64).sqrt()
+        #[cfg(feature = "std")]
+        { (geom_dev_tot / self.total_count as f64).sqrt() }
+        #[cfg(feature = "core")]
+        { libm::sqrt(geom_dev_tot / self.total_count as f64) }
     }
 
     /// Get the value at a given percentile.
@@ -1738,7 +1752,7 @@ struct RestatState<T: Counter> {
     max_index: Option<usize>,
     min_index: Option<usize>,
     total_count: u64,
-    phantom: std::marker::PhantomData<T>,
+    phantom: ::core::marker::PhantomData<T>,
 }
 
 impl<T: Counter> RestatState<T> {
@@ -1747,7 +1761,7 @@ impl<T: Counter> RestatState<T> {
             max_index: None,
             min_index: None,
             total_count: 0,
-            phantom: std::marker::PhantomData,
+            phantom: ::core::marker::PhantomData,
         }
     }
 
@@ -1812,8 +1826,7 @@ impl<'a, T: Counter> Add<&'a Histogram<T>> for Histogram<T> {
     }
 }
 
-use std::iter;
-impl<T: Counter> iter::Sum for Histogram<T> {
+impl<T: Counter> ::core::iter::Sum for Histogram<T> {
     fn sum<I>(mut iter: I) -> Self
     where
         I: Iterator<Item = Self>,

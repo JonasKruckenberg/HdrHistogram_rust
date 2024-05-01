@@ -1,6 +1,5 @@
 //! Error types used throughout this library
-use std::error::Error;
-use std::fmt;
+use core::fmt;
 
 /// Errors that can occur when creating a histogram.
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
@@ -87,7 +86,8 @@ impl fmt::Display for CreationError {
     }
 }
 
-impl Error for CreationError {}
+#[cfg(feature = "std")]
+impl std::error::Error for CreationError {}
 
 impl fmt::Display for AdditionError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -98,7 +98,8 @@ impl fmt::Display for AdditionError {
     }
 }
 
-impl Error for AdditionError {}
+#[cfg(feature = "std")]
+impl std::error::Error for AdditionError {}
 
 impl fmt::Display for SubtractionError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -109,7 +110,8 @@ impl fmt::Display for SubtractionError {
     }
 }
 
-impl Error for SubtractionError {}
+#[cfg(feature = "std")]
+impl std::error::Error for SubtractionError {}
 
 impl fmt::Display for RecordError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -120,7 +122,8 @@ impl fmt::Display for RecordError {
     }
 }
 
-impl Error for RecordError {}
+#[cfg(feature = "std")]
+impl std::error::Error for RecordError {}
 
 impl fmt::Display for UsizeTypeTooSmall {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -131,4 +134,5 @@ impl fmt::Display for UsizeTypeTooSmall {
     }
 }
 
-impl Error for UsizeTypeTooSmall {}
+#[cfg(feature = "std")]
+impl std::error::Error for UsizeTypeTooSmall {}

@@ -127,7 +127,11 @@ impl<'a, T: 'a + Counter> PickyIterator<T> for Iter<'a, T> {
         // to 75%, etc.
         // Minimum of 0 (1.0/1.0 = 1, log 2 of which is 0) so unsigned cast is safe.
         // Won't hit the `inf` case because quantile < 1.0, so this should yield an actual number.
+        #[cfg(feature = "std")]
         let num_halvings = (1.0 / (1.0 - self.quantile_to_iterate_to)).log2() as u32;
+        #[cfg(feature = "core")]
+        let num_halvings = libm::log2(1.0 / (1.0 - self.quantile_to_iterate_to)) as u32;
+
         // Calculate the total number of ticks in 0-1 given that half of each slice is tick'd.
         // The number of slices is 2 ^ num_halvings, and each slice has two "half distances" to
         // tick, so we add an extra power of two to get ticks per whole distance.
