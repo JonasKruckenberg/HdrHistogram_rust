@@ -691,6 +691,45 @@ impl<T: Counter> Histogram<T> {
     // Construction.
     // ********************************************************************************************
 
+    /// Construct a `Histogram` from its raw properties
+    pub unsafe fn from_raw_parts(
+        auto_resize: bool,
+        highest_trackable_value: u64,
+        lowest_discernible_value: u64,
+        significant_value_digits: u8,
+        bucket_count: u8,
+        sub_bucket_count: u32,
+        sub_bucket_half_count: u32,
+        sub_bucket_half_count_magnitude: u8,
+        sub_bucket_mask: u64,
+        leading_zero_count_base: u8,
+        unit_magnitude: u8,
+        unit_magnitude_mask: u64,
+        max_value: u64,
+        min_non_zero_value: u64,
+        total_count: u64,
+        counts: Vec<T>,
+    ) -> Self {
+        Self {
+            auto_resize,
+            highest_trackable_value,
+            lowest_discernible_value,
+            significant_value_digits,
+            bucket_count,
+            sub_bucket_count,
+            sub_bucket_half_count,
+            sub_bucket_half_count_magnitude,
+            sub_bucket_mask,
+            leading_zero_count_base,
+            unit_magnitude,
+            unit_magnitude_mask,
+            max_value,
+            min_non_zero_value,
+            total_count,
+            counts,
+        }
+    }
+
     /// Construct an auto-resizing `Histogram` with a lowest discernible value of 1 and an
     /// auto-adjusting highest trackable value. Can auto-resize up to track values up to
     /// `(i64::max_value() / 2)`.
