@@ -71,6 +71,7 @@ impl Serializer for V2Serializer {
     }
 
     fn serialize_to_buf<T: Counter>(&mut self, h: &Histogram<T>, buf: &mut [u8]) -> Result<usize, Self::SerializeError> {
+        log::debug!("buf len {}", buf.len());
         // TODO benchmark encoding directly into target Vec
         assert_eq!(buf.len(), self.max_size(h)?);
 
